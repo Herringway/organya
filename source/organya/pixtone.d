@@ -28,7 +28,7 @@ align(1) struct PIXTONEPARAMETER {
 	int pointCy;
 }
 
-immutable gWaveModelTable = MakeWaveTables();
+private immutable gWaveModelTable = MakeWaveTables();
 
 private byte[0x100][6] MakeWaveTables() @safe {
 	byte[0x100][6] table;
@@ -83,7 +83,7 @@ private byte[0x100][6] MakeWaveTables() @safe {
 	return table;
 }
 
-void MakePixelWaveData(const PIXTONEPARAMETER ptp, ubyte[] pData) @safe {
+private void MakePixelWaveData(const PIXTONEPARAMETER ptp, ubyte[] pData) @safe {
 	int i;
 	int a, b, c, d;
 
@@ -175,7 +175,7 @@ void MakePixelWaveData(const PIXTONEPARAMETER ptp, ubyte[] pData) @safe {
 	}
 }
 
-int MakePixToneObject(ref Organya org, const(PIXTONEPARAMETER)[] ptp, int no) @safe {
+package int MakePixToneObject(ref Organya org, const(PIXTONEPARAMETER)[] ptp, int no) @safe {
 	int sample_count;
 	int i, j;
 	ubyte[] pcm_buffer;

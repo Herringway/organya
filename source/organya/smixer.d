@@ -5,6 +5,8 @@ import std.experimental.logger;
 import std.exception;
 import std.math;
 
+package:
+
 enum SoundPlayFlags {
 	normal,
 	looping
