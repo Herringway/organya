@@ -125,7 +125,7 @@ struct Organya {
 	private ubyte[MAXTRACK] old_key = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];	// 再生中の音 (Sound being played)
 	private ubyte[MAXTRACK] key_on;	// キースイッチ (Key switch)
 	private ubyte[MAXTRACK] key_twin;	// 今使っているキー(連続時のノイズ防止の為に二つ用意) (Currently used keys (prepared for continuous noise prevention))
-	public void InitOrgData() {
+	public void InitOrgData() @system {
 		info.alloc_note = ALLOCNOTE;
 		info.dot = 4;
 		info.line = 4;
@@ -161,7 +161,7 @@ struct Organya {
 		return mi;
 	}
 	// 指定の数だけNoteDataの領域を確保(初期化) (Allocate the specified number of NoteData areas (initialization))
-	private bool NoteAlloc(ushort alloc) {
+	private bool NoteAlloc(ushort alloc) @system {
 		int i,j;
 
 		for (j = 0; j < MAXTRACK; j++) {
@@ -195,7 +195,7 @@ struct Organya {
 		return true;
 	}
 	// NoteDataを開放 (Release NoteData)
-	private void ReleaseNote() {
+	private void ReleaseNote() @safe {
 		for (int i = 0; i < MAXTRACK; i++) {
 			if (info.tdata[i].note_p != null) {
 				info.tdata[i].note_p = null;
@@ -275,7 +275,7 @@ struct Organya {
 		PlayPos = x;
 	}
 	//// 以下はファイル関係 (The following are related to files)
-	private bool InitMusicData(const(ubyte)[] p) {
+	private bool InitMusicData(const(ubyte)[] p) @system {
 		static ushort READ_LE16(ref const(ubyte)[] p) { scope(exit) p = p[2 .. $]; return ((p[1] << 8) | p[0]); }
 		static uint READ_LE32(ref const(ubyte)[] p) { scope(exit) p = p[4 .. $]; return ((p[3] << 24) | (p[2] << 16) | (p[1] << 8) | p[0]); }
 
@@ -399,13 +399,13 @@ struct Organya {
 		return true;
 	}
 	// Start and end organya
-	public void initialize() @trusted {
+	public void initialize() @system {
 		InitOrgData();
 
 		backend.setMusicCallback(&OrganyaCallback);
 	}
 	// Load organya file
-	public bool LoadOrganya(const(ubyte)[] data) @trusted
+	public bool LoadOrganya(const(ubyte)[] data) @system
 		in(data, "No organya data")
 	{
 		if (!InitMusicData(data))
@@ -416,17 +416,17 @@ struct Organya {
 
 		return true;
 	}
-	public void SetOrganyaPosition(uint x) @trusted {
+	public void SetOrganyaPosition(uint x) @safe {
 		SetPlayPointer(x);
 		Volume = 100;
 		bFadeout = false;
 	}
 
-	public uint GetOrganyaPosition() @trusted {
+	public uint GetOrganyaPosition() @safe {
 		return PlayPos;
 	}
 
-	public void PlayOrganyaMusic() @trusted {
+	public void PlayOrganyaMusic() @safe {
 		backend.setMusicTimer(info.wait);
 	}
 	private bool MakeSoundObject8(const byte[] wavep, byte track, byte pipi) @safe {
@@ -617,7 +617,7 @@ struct Organya {
 			}
 		}
 	}
-	public bool ChangeOrganyaVolume(int volume) @trusted {
+	public bool ChangeOrganyaVolume(int volume) @safe {
 		if (volume < 0 || volume > 100)
 			return false;
 
@@ -625,7 +625,7 @@ struct Organya {
 		return true;
 	}
 
-	public void StopOrganyaMusic() @trusted {
+	public void StopOrganyaMusic() @safe {
 		backend.setMusicTimer(0);
 
 		// Stop notes
@@ -637,11 +637,11 @@ struct Organya {
 		key_twin = key_twin.init;
 	}
 
-	public void SetOrganyaFadeout() @trusted {
+	public void SetOrganyaFadeout() @safe {
 		bFadeout = true;
 	}
 
-	public void EndOrganya() @trusted {
+	public void EndOrganya() @safe {
 		backend.setMusicTimer(0);
 
 		// Release everything related to org
@@ -659,9 +659,9 @@ struct Organya {
 			finalBuffer[i] = cast(short)clamp(buffer[i], short.min, short.max);
 		}
 	}
-	public void loadData(const(ubyte)[] data) {
+	public void loadData(const(ubyte)[] data) @safe {
 		import std.file : read;
-		gPtpTable = cast(PIXTONEPARAMETER[])(data[0 .. ($ / PIXTONEPARAMETER.sizeof) * PIXTONEPARAMETER.sizeof]);
+		gPtpTable = cast(const(PIXTONEPARAMETER)[])(data[0 .. ($ / PIXTONEPARAMETER.sizeof) * PIXTONEPARAMETER.sizeof]);
 		int pt_size = 0;
 		pt_size += MakePixToneObject(this, gPtpTable[0 .. 2], 32);
 		pt_size += MakePixToneObject(this, gPtpTable[2 .. 4], 33);
@@ -755,9 +755,3 @@ struct Organya {
 
 private immutable pass = "Org-01";
 private immutable pass2 = "Org-02";	// Pipi
-
-private bool testFlagSet(T)(const T val, T flag) {
-	return !!(val & flag);
-}
-
-
