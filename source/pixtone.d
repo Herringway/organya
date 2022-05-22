@@ -85,9 +85,7 @@ private byte[0x100][6] MakeWaveTables() @safe {
 	return table;
 }
 
-//BOOL wave_tables_made;
-
-bool MakePixelWaveData(const PIXTONEPARAMETER ptp, ubyte[] pData) @safe {
+void MakePixelWaveData(const PIXTONEPARAMETER ptp, ubyte[] pData) @safe {
 	int i;
 	int a, b, c, d;
 
@@ -178,8 +176,6 @@ bool MakePixelWaveData(const PIXTONEPARAMETER ptp, ubyte[] pData) @safe {
 		dPitch += d2;
 		dVolume += d3;
 	}
-
-	return true;
 }
 
 int MakePixToneObject(ref Organya org, const(PIXTONEPARAMETER)[] ptp, int no) @safe {
@@ -212,10 +208,7 @@ int MakePixToneObject(ref Organya org, const(PIXTONEPARAMETER)[] ptp, int no) @s
 
 	for (i = 0; i < ptp.length; i++)
 	{
-		if (!MakePixelWaveData(ptp[i], pcm_buffer))
-		{
-			return -1;
-		}
+		MakePixelWaveData(ptp[i], pcm_buffer);
 
 		for (j = 0; j < ptp[i].size; j++)
 		{
