@@ -60,7 +60,7 @@ int main(string[] args) {
 	org.initialize();
 
 	trace("Loading organya data");
-	loadData(org);
+	org.loadData(cast(ubyte[])read("pixtone.tbl"));
 
 	trace("Loading organya file");
 	// Load file
