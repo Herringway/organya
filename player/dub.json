@@ -1,6 +1,6 @@
 {
 	"description": "organya player",
-	"license": "BSL-1.0",
+	"license": "BSD 3-clause",
 	"name": "player",
 	"targetType": "executable",
 	"dependencies": {

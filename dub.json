@@ -1,6 +1,6 @@
 {
 	"description": "PIXEL's organya audio format",
-	"license": "proprietary",
+	"license": "BSD 3-clause",
 	"name": "organya",
 	"stringImportPaths": ["data"],
 	"subPackages": [
