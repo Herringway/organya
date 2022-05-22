@@ -198,11 +198,6 @@ int MakePixToneObject(ref Organya org, const(PIXTONEPARAMETER)[] ptp, int no) @s
 	pcm_buffer = new ubyte[](sample_count);
 	mixed_pcm_buffer = new ubyte[](sample_count);
 
-	if (pcm_buffer == null || mixed_pcm_buffer == null)
-	{
-		return -1;
-	}
-
 	pcm_buffer[0 .. sample_count] = 0x80;
 	mixed_pcm_buffer[0 .. sample_count] = 0x80;
 
