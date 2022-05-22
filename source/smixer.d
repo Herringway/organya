@@ -55,14 +55,14 @@ struct Mixer_Sound {
 
 private enum output_frequency = 48000;
 struct SoftwareMixer {
-	Mixer mixer;
+	private Mixer_Sound *sound_list_head;
 	private void delegate() @safe nothrow callback;
 	private uint callback_timer_master;
 	alias Sound = Mixer_Sound;
 
 	void mixSoundsAndUpdateMusic(scope int[] stream) @safe nothrow {
 		if (callback_timer_master == 0) {
-			mixer.mixSounds(stream);
+			mixSounds(stream);
 		} else {
 			uint frames_done = 0;
 
@@ -76,20 +76,12 @@ struct SoftwareMixer {
 
 				const ulong frames_to_do = min(callback_timer, stream.length / 2 - frames_done);
 
-				mixer.mixSounds(stream[frames_done * 2 .. frames_done * 2 + frames_to_do * 2]);
+				mixSounds(stream[frames_done * 2 .. frames_done * 2 + frames_to_do * 2]);
 
 				frames_done += frames_to_do;
 				callback_timer -= frames_to_do;
 			}
 		}
-	}
-
-	Sound* createSound(uint frequency, const(ubyte)[] samples) @safe {
-		return mixer.createSound(frequency, samples);
-	}
-
-	void destroySound(ref Sound sound) @safe {
-		mixer.destroySound(sound);
 	}
 
 	void play(ref Sound sound, SoundPlayFlags flags) @safe nothrow {
@@ -124,17 +116,6 @@ struct SoftwareMixer {
 	void setMusicTimer(uint milliseconds) @safe {
 		callback_timer_master = (milliseconds * output_frequency) / 1000;
 	}
-}
-
-
-private ushort MillibelToScale(int volume) @safe pure @nogc nothrow {
-	// Volume is in hundredths of a decibel, from 0 to -10000
-	volume = clamp(volume, -10000, 0);
-	return cast(ushort)(pow(10.0, volume / 2000.0) * 256.0);
-}
-
-struct Mixer {
-	private Mixer_Sound *sound_list_head;
 	Mixer_Sound* createSound(uint frequency, const(ubyte)[] samples) @safe {
 		Mixer_Sound* sound = new Mixer_Sound();
 
@@ -212,4 +193,10 @@ struct Mixer {
 			}
 		}
 	}
+}
+
+private ushort MillibelToScale(int volume) @safe pure @nogc nothrow {
+	// Volume is in hundredths of a decibel, from 0 to -10000
+	volume = clamp(volume, -10000, 0);
+	return cast(ushort)(pow(10.0, volume / 2000.0) * 256.0);
 }
