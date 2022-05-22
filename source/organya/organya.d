@@ -49,7 +49,7 @@ private struct TRACKDATA {
 	ubyte wave_no;	// Waveform No.
 	byte pipi;
 
-	NOTELIST *note_p;
+	NOTELIST[] note_p;
 	NOTELIST *note_list;
 }
 
@@ -125,7 +125,7 @@ struct Organya {
 	private ubyte[MAXTRACK] old_key = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];	// 再生中の音 (Sound being played)
 	private ubyte[MAXTRACK] key_on;	// キースイッチ (Key switch)
 	private ubyte[MAXTRACK] key_twin;	// 今使っているキー(連続時のノイズ防止の為に二つ用意) (Currently used keys (prepared for continuous noise prevention))
-	public void InitOrgData() @system {
+	public void InitOrgData() @safe {
 		info.alloc_note = ALLOCNOTE;
 		info.dot = 4;
 		info.line = 4;
@@ -161,14 +161,13 @@ struct Organya {
 		return mi;
 	}
 	// 指定の数だけNoteDataの領域を確保(初期化) (Allocate the specified number of NoteData areas (initialization))
-	private bool NoteAlloc(ushort alloc) @system {
+	private bool NoteAlloc(ushort alloc) @safe {
 		int i,j;
 
 		for (j = 0; j < MAXTRACK; j++) {
 			info.tdata[j].wave_no = 0;
 			info.tdata[j].note_list = null;	// コンストラクタにやらせたい (I want the constructor to do it)
-			info.tdata[j].note_p = new NOTELIST[](alloc).ptr;
-			assert(info.tdata[j].note_p);
+			info.tdata[j].note_p = new NOTELIST[](alloc);
 			if (info.tdata[j].note_p == null) {
 				for (i = 0; i < MAXTRACK; i++) {
 					if (info.tdata[i].note_p != null) {
@@ -180,12 +179,12 @@ struct Organya {
 			}
 
 			for (i = 0; i < alloc; i++) {
-				(info.tdata[j].note_p + i).from = null;
-				(info.tdata[j].note_p + i).to = null;
-				(info.tdata[j].note_p + i).length_ = 0;
-				(info.tdata[j].note_p + i).pan = PANDUMMY;
-				(info.tdata[j].note_p + i).volume = VOLDUMMY;
-				(info.tdata[j].note_p + i).y = KEYDUMMY;
+				(info.tdata[j].note_p[i]).from = null;
+				(info.tdata[j].note_p[i]).to = null;
+				(info.tdata[j].note_p[i]).length_ = 0;
+				(info.tdata[j].note_p[i]).pan = PANDUMMY;
+				(info.tdata[j].note_p[i]).volume = VOLDUMMY;
+				(info.tdata[j].note_p[i]).y = KEYDUMMY;
 			}
 		}
 
@@ -331,8 +330,8 @@ struct Organya {
 			}
 
 			// リストを作る (Make a list)
-			np = cast(NOTELIST*)info.tdata[j].note_p;
-			info.tdata[j].note_list = info.tdata[j].note_p;
+			np = &info.tdata[j].note_p[0];
+			info.tdata[j].note_list = &info.tdata[j].note_p[0];
 			assert(np);
 			np.from = null;
 			np.to = (np + 1);
@@ -349,34 +348,34 @@ struct Organya {
 			np.to = null;
 
 			// 内容を代入 (Assign content)
-			np = cast(NOTELIST*)info.tdata[j].note_p;	// Ｘ座標 (X coordinate)
+			np = &info.tdata[j].note_p[0];	// Ｘ座標 (X coordinate)
 			for (i = 0; i < note_num[j]; i++) {
 				np.x = READ_LE32(p);
 				np++;
 			}
 
-			np = cast(NOTELIST*)info.tdata[j].note_p;	// Ｙ座標 (Y coordinate)
+			np = &info.tdata[j].note_p[0];	// Ｙ座標 (Y coordinate)
 			for (i = 0; i < note_num[j]; i++) {
 				np.y = p[0];
 				p = p[1 .. $];
 				np++;
 			}
 
-			np = cast(NOTELIST*)info.tdata[j].note_p;	// 長さ (Length)
+			np = &info.tdata[j].note_p[0];	// 長さ (Length)
 			for (i = 0; i < note_num[j]; i++) {
 				np.length_ = p[0];
 				p = p[1 .. $];
 				np++;
 			}
 
-			np = cast(NOTELIST*)info.tdata[j].note_p;	// ボリューム (Volume)
+			np = &info.tdata[j].note_p[0];	// ボリューム (Volume)
 			for (i = 0; i < note_num[j]; i++) {
 				np.volume = p[0];
 				p = p[1 .. $];
 				np++;
 			}
 
-			np = cast(NOTELIST*)info.tdata[j].note_p;	// パン (Pan)
+			np = &info.tdata[j].note_p[0];	// パン (Pan)
 			for (i = 0; i < note_num[j]; i++) {
 				np.pan = p[0];
 				p = p[1 .. $];
@@ -399,7 +398,7 @@ struct Organya {
 		return true;
 	}
 	// Start and end organya
-	public void initialize() @system {
+	public void initialize() @safe {
 		InitOrgData();
 
 		backend.setMusicCallback(&OrganyaCallback);
