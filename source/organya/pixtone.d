@@ -5,7 +5,7 @@ import std.math;
 import organya.organya;
 
 align(1) struct PIXTONEPARAMETER2 {
-	align(1):
+align(1):
 	int model;
 	double num;
 	int top;
@@ -13,7 +13,7 @@ align(1) struct PIXTONEPARAMETER2 {
 }
 
 align(1) struct PIXTONEPARAMETER {
-	align(1):
+align(1):
 	int use;
 	int size;
 	PIXTONEPARAMETER2 oMain;
@@ -78,7 +78,7 @@ private byte[0x100][6] MakeWaveTables() @safe {
 	// White noise wave
 	Random rng;
 	for (i = 0; i < 0x100; ++i) {
-		table[5][i] = cast(byte)uniform(0, 127, rng);
+		table[5][i] = cast(byte) uniform(0, 127, rng);
 	}
 	return table;
 }
@@ -102,28 +102,28 @@ private void MakePixelWaveData(const PIXTONEPARAMETER ptp, ubyte[] pData) @safe 
 
 	dEnvelope = ptp.initial;
 	while (i < ptp.pointAx) {
-		envelopeTable[i] = cast(byte)dEnvelope;
-		dEnvelope = ((cast(double)ptp.pointAy - ptp.initial) / ptp.pointAx) + dEnvelope;
+		envelopeTable[i] = cast(byte) dEnvelope;
+		dEnvelope = ((cast(double) ptp.pointAy - ptp.initial) / ptp.pointAx) + dEnvelope;
 		++i;
 	}
 
 	dEnvelope = ptp.pointAy;
 	while (i < ptp.pointBx) {
-		envelopeTable[i] = cast(byte)dEnvelope;
-		dEnvelope = ((cast(double)ptp.pointBy - ptp.pointAy) / cast(double)(ptp.pointBx - ptp.pointAx)) + dEnvelope;
+		envelopeTable[i] = cast(byte) dEnvelope;
+		dEnvelope = ((cast(double) ptp.pointBy - ptp.pointAy) / cast(double)(ptp.pointBx - ptp.pointAx)) + dEnvelope;
 		++i;
 	}
 
 	dEnvelope = ptp.pointBy;
 	while (i < ptp.pointCx) {
-		envelopeTable[i] = cast(byte)dEnvelope;
-		dEnvelope = (cast(double)ptp.pointCy - ptp.pointBy) / cast(double)(ptp.pointCx - ptp.pointBx) + dEnvelope;
+		envelopeTable[i] = cast(byte) dEnvelope;
+		dEnvelope = (cast(double) ptp.pointCy - ptp.pointBy) / cast(double)(ptp.pointCx - ptp.pointBx) + dEnvelope;
 		++i;
 	}
 
 	dEnvelope = ptp.pointCy;
 	while (i < 0x100) {
-		envelopeTable[i] = cast(byte)dEnvelope;
+		envelopeTable[i] = cast(byte) dEnvelope;
 		dEnvelope = dEnvelope - (ptp.pointCy / cast(double)(0x100 - ptp.pointCx));
 		++i;
 	}
@@ -151,21 +151,14 @@ private void MakePixelWaveData(const PIXTONEPARAMETER ptp, ubyte[] pData) @safe 
 	}
 
 	for (i = 0; i < ptp.size; ++i) {
-		a = cast(int)dMain % 0x100;
-		b = cast(int)dPitch % 0x100;
-		c = cast(int)dVolume % 0x100;
+		a = cast(int) dMain % 0x100;
+		b = cast(int) dPitch % 0x100;
+		c = cast(int) dVolume % 0x100;
 		d = cast(int)(cast(double)(i * 0x100) / ptp.size);
-		pData[i] = cast(ubyte)(gWaveModelTable[ptp.oMain.model][a]
-		         * ptp.oMain.top
-		         / 64
-		         * (((gWaveModelTable[ptp.oVolume.model][c] * ptp.oVolume.top) / 64) + 64)
-		         / 64
-		         * envelopeTable[d]
-		         / 64
-		         + 128);
+		pData[i] = cast(ubyte)(gWaveModelTable[ptp.oMain.model][a] * ptp.oMain.top / 64 * (((gWaveModelTable[ptp.oVolume.model][c] * ptp.oVolume.top) / 64) + 64) / 64 * envelopeTable[d] / 64 + 128);
 
 		if (gWaveModelTable[ptp.oPitch.model][b] < 0) {
-			dMain += d1 - d1 * 0.5 * -cast(int)gWaveModelTable[ptp.oPitch.model][b] * ptp.oPitch.top / 64.0 / 64.0;
+			dMain += d1 - d1 * 0.5 * -cast(int) gWaveModelTable[ptp.oPitch.model][b] * ptp.oPitch.top / 64.0 / 64.0;
 		} else {
 			dMain += d1 + d1 * 2.0 * gWaveModelTable[ptp.oPitch.model][b] * ptp.oPitch.top / 64.0 / 64.0;
 		}
@@ -211,7 +204,7 @@ package int MakePixToneObject(ref Organya org, const(PIXTONEPARAMETER)[] ptp, in
 		}
 	}
 
-	org.lpSECONDARYBUFFER[no] = org.createSound(22050, mixed_pcm_buffer[0 .. sample_count]);
+	org.secondaryAllocatedSounds[no] = org.createSound(22050, mixed_pcm_buffer[0 .. sample_count]);
 
 	return sample_count;
 }

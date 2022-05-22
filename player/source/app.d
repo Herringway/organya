@@ -11,12 +11,8 @@ import std.string;
 import std.utf;
 import bindbc.sdl : SDL_AudioCallback, SDL_AudioDeviceID;
 
-enum _CHANNEL_NUM = 2;
-enum _SAMPLE_PER_SECOND = 48000;
-
-__gshared SDL_AudioDeviceID dev;
-
 bool initAudio(SDL_AudioCallback fun, ubyte channels, uint sampleRate, void* userdata = null) {
+	SDL_AudioDeviceID dev;
 	import bindbc.sdl;
 
 	enforce(loadSDL() == sdlSupport);
@@ -46,6 +42,8 @@ extern (C) void _sampling_func(void* user, ubyte* buf, int bufSize) nothrow {
 }
 
 int main(string[] args) {
+	enum channels = 2;
+	enum sampleRate = 44100;
 	if (args.length < 2) {
 		return 1;
 	}
@@ -55,24 +53,25 @@ int main(string[] args) {
 	auto file = cast(ubyte[])read(args[1]);
 
 	// pxtone initialization
-	auto org = Organya();
+	Organya org;
 	trace("Initializing Organya");
-	org.initialize();
+	org.initialize(sampleRate);
 
 	trace("Loading organya data");
 	org.loadData(cast(ubyte[])read("pixtone.tbl"));
 
 	trace("Loading organya file");
 	// Load file
-	org.LoadOrganya(file);
+	org.loadMusic(file);
 
 	// Prepare to play music
-	if (!initAudio(&_sampling_func, _CHANNEL_NUM, _SAMPLE_PER_SECOND, &org)) {
+	if (!initAudio(&_sampling_func, channels, sampleRate, &org)) {
 		return 1;
 	}
 	trace("SDL audio init success");
 
-	org.PlayOrganyaMusic();
+	org.playMusic();
+	trace("Playing organya music");
 
 	writeln("Press enter to exit");
 	readln();
