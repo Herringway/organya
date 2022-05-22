@@ -2,6 +2,7 @@ module smixer;
 
 import std.algorithm.comparison;
 import std.experimental.logger;
+import std.exception;
 import std.math;
 
 enum SoundPlayFlags {
@@ -119,14 +120,7 @@ struct SoftwareMixer {
 	Mixer_Sound* createSound(uint frequency, const(ubyte)[] samples) @safe {
 		Mixer_Sound* sound = new Mixer_Sound();
 
-		if (sound == null)
-			return null;
-
 		sound.samples = new byte[](samples.length + 1);
-
-		if (sound.samples == null) {
-			return null;
-		}
 
 		foreach (idx, ref sample; sound.samples[0 .. $ - 1]) {
 			sample = samples[idx] - 0x80;
