@@ -1,6 +1,6 @@
 module pixtone;
 
-import core.stdc.stdlib;
+import std.random;
 import std.math;
 import organya;
 
@@ -30,58 +30,59 @@ align(1) struct PIXTONEPARAMETER
 	int pointCy;
 }
 
-byte[0x100][6] gWaveModelTable;
+immutable gWaveModelTable = MakeWaveTables();
 
-void MakeWaveTables() @safe
-{
+private byte[0x100][6] MakeWaveTables() @safe {
+	byte[0x100][6] table;
 	int i;
 
 	int a;
-
 	// Sine wave
-	for (i = 0; i < 0x100; ++i)
-	{
-		gWaveModelTable[0][i] = cast(byte)(sin((i * 6.283184) / 256.0) * 64.0);
+	for (i = 0; i < 0x100; ++i) {
+		table[0][i] = cast(byte)(sin((i * 6.283184) / 256.0) * 64.0);
 	}
 
 	// Triangle wave
-	for (a = 0, i = 0; i < 0x40; ++i)
-	{
+	for (a = 0, i = 0; i < 0x40; ++i) {
 		// Upwards
-		gWaveModelTable[1][i] = cast(byte)((a * 0x40) / 0x40);
+		table[1][i] = cast(byte)((a * 0x40) / 0x40);
 		++a;
 	}
-	for (a = 0; i < 0xC0; ++i)
-	{
+	for (a = 0; i < 0xC0; ++i) {
 		// Downwards
-		gWaveModelTable[1][i] = cast(byte)(0x40 - ((a * 0x40) / 0x40));
+		table[1][i] = cast(byte)(0x40 - ((a * 0x40) / 0x40));
 		++a;
 	}
-	for (a = 0; i < 0x100; ++i)
-	{
+	for (a = 0; i < 0x100; ++i) {
 		// Back up
-		gWaveModelTable[1][i] = cast(byte)(((a * 0x40) / 0x40) - 0x40);
+		table[1][i] = cast(byte)(((a * 0x40) / 0x40) - 0x40);
 		++a;
 	}
 
 	// Saw up wave
-	for (i = 0; i < 0x100; ++i)
-		gWaveModelTable[2][i] = cast(byte)((i / 2) - 0x40);
+	for (i = 0; i < 0x100; ++i) {
+		table[2][i] = cast(byte)((i / 2) - 0x40);
+	}
 
 	// Saw down wave
-	for (i = 0; i < 0x100; ++i)
-		gWaveModelTable[3][i] = cast(byte)(0x40 - (i / 2));
+	for (i = 0; i < 0x100; ++i) {
+		table[3][i] = cast(byte)(0x40 - (i / 2));
+	}
 
 	// Square wave
-	for (i = 0; i < 0x80; ++i)
-		gWaveModelTable[4][i] = 0x40;
-	for (; i < 0x100; ++i)
-		gWaveModelTable[4][i] = -0x40;
+	for (i = 0; i < 0x80; ++i) {
+		table[4][i] = 0x40;
+	}
+	for (; i < 0x100; ++i) {
+		table[4][i] = -0x40;
+	}
 
 	// White noise wave
-	srand(0);
-	for (i = 0; i < 0x100; ++i)
-		gWaveModelTable[5][i] = cast(byte)(rand() & 0xFF) / 2;
+	Random rng;
+	for (i = 0; i < 0x100; ++i) {
+		table[5][i] = cast(byte)uniform(0, 127, rng);
+	}
+	return table;
 }
 
 //BOOL wave_tables_made;
@@ -98,13 +99,6 @@ bool MakePixelWaveData(const PIXTONEPARAMETER ptp, ubyte[] pData) @safe {
 	byte[0x100] envelopeTable;
 
 	double d1, d2, d3;
-
-	// The Linux port added a cute optimisation here, where MakeWaveTables is only called once during the game's execution
-	//if (wave_tables_made != true)
-	//{
-		MakeWaveTables();
-	//	wave_tables_made = true;
-	//}
 
 	envelopeTable = envelopeTable.init;
 
