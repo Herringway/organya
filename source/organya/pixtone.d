@@ -1,8 +1,8 @@
-module pixtone;
+module organya.pixtone;
 
 import std.random;
 import std.math;
-import organya;
+import organya.organya;
 
 align(1) struct PIXTONEPARAMETER2 {
 	align(1):

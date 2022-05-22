@@ -1,11 +1,11 @@
-module organya;
+module organya.organya;
 
 import core.time;
 import std.experimental.logger;
 import std.algorithm.comparison;
 
-import pixtone;
-import smixer;
+import organya.pixtone;
+import organya.smixer;
 
 enum MAXTRACK = 16;
 enum MAXMELODY = 8;
@@ -109,32 +109,24 @@ byte[0x100][100] initWaveData(const(ubyte)[] wavedata) @safe {
 immutable ubyte[] wave100 = cast(immutable(ubyte)[])import("Wave.dat");
 
 struct Organya {
-	Mixer_Sound*[2][8][8] lpORGANBUFFER;
-	Mixer_Sound*[512] lpSECONDARYBUFFER;
-	SoftwareMixer backend;
-	MUSICINFO info;
-	char track;
-	char[MAXTRACK] mute;
-	ubyte def_pan;
-	ubyte def_volume;
-	uint ExactTime = 13;	// 最小精度 (Minimum accuracy)
-	uint TimerID;
-	bool bTimer;
+	private Mixer_Sound*[2][8][8] lpORGANBUFFER;
+	package Mixer_Sound*[512] lpSECONDARYBUFFER;
+	package SoftwareMixer backend;
+	private MUSICINFO info;
 
 	// Play data
-	int PlayPos;	// Called 'play_p' in the source code release
-	NOTELIST*[MAXTRACK] np;
-	int[MAXMELODY] now_leng;
+	private int PlayPos;	// Called 'play_p' in the source code release
+	private NOTELIST*[MAXTRACK] np;
+	private int[MAXMELODY] now_leng;
 
-	int Volume = 100;
-	int[MAXTRACK] TrackVol;
-	bool bFadeout = false;
-	bool[MAXTRACK] g_mute;	// Used by the debug Mute menu
-	ubyte[MAXTRACK] old_key = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];	// 再生中の音 (Sound being played)
-	ubyte[MAXTRACK] key_on;	// キースイッチ (Key switch)
-	ubyte[MAXTRACK] key_twin;	// 今使っているキー(連続時のノイズ防止の為に二つ用意) (Currently used keys (prepared for continuous noise prevention))
+	private int Volume = 100;
+	private int[MAXTRACK] TrackVol;
+	private bool bFadeout = false;
+	private bool[MAXTRACK] g_mute;	// Used by the debug Mute menu
+	private ubyte[MAXTRACK] old_key = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];	// 再生中の音 (Sound being played)
+	private ubyte[MAXTRACK] key_on;	// キースイッチ (Key switch)
+	private ubyte[MAXTRACK] key_twin;	// 今使っているキー(連続時のノイズ防止の為に二つ用意) (Currently used keys (prepared for continuous noise prevention))
 	void InitOrgData() {
-		track = 0;
 		info.alloc_note = ALLOCNOTE;	// とりあえず10000個確保 (For the time being, secure 10,000 pieces)
 		info.dot = 4;
 		info.line = 4;
@@ -151,13 +143,11 @@ struct Organya {
 		if (!NoteAlloc(info.alloc_note)) {
 			error("Note allocation failed");
 		}
-		SetMusicInfo(&info, SETALL);
-
-		def_pan = DEFPAN;
-		def_volume = DEFVOLUME;
+		//SetMusicInfo(SETALL);
 	}
 	// 曲情報を取得 (Get song information)
-	void GetMusicInfo(MUSICINFO *mi) @safe {
+	MUSICINFO GetMusicInfo() @safe {
+		MUSICINFO mi;
 		mi.dot = info.dot;
 		mi.line = info.line;
 		mi.alloc_note = info.alloc_note;
@@ -170,42 +160,43 @@ struct Organya {
 			mi.tdata[i].wave_no = info.tdata[i].wave_no;
 			mi.tdata[i].pipi = info.tdata[i].pipi;
 		}
+		return mi;
 	}
 	// 曲情報を設定。flagはアイテムを指定 (Set song information. flag specifies an item)
-	bool SetMusicInfo(MUSICINFO* mi, uint flag) @safe {
-		int i;
+	//private bool SetMusicInfo(uint flag) @safe {
+	//	int i;
 
-		if (flag.testFlagSet(SETGRID)) {	// グリッドを有効に (Enable grid)
-			info.dot = mi.dot;
-			info.line = mi.line;
-		}
+	//	if (flag.testFlagSet(SETGRID)) {	// グリッドを有効に (Enable grid)
+	//		info.dot = mi.dot;
+	//		info.line = mi.line;
+	//	}
 
-		if (flag.testFlagSet(SETWAIT)) {
-			info.wait = mi.wait;
-		}
+	//	if (flag.testFlagSet(SETWAIT)) {
+	//		info.wait = mi.wait;
+	//	}
 
-		if (flag.testFlagSet(SETREPEAT)) {
-			info.repeat_x = mi.repeat_x;
-			info.end_x = mi.end_x;
-		}
+	//	if (flag.testFlagSet(SETREPEAT)) {
+	//		info.repeat_x = mi.repeat_x;
+	//		info.end_x = mi.end_x;
+	//	}
 
-		if (flag.testFlagSet(SETFREQ)) {
-			for (i = 0; i < MAXMELODY; i++) {
-				info.tdata[i].freq = mi.tdata[i].freq;
-				info.tdata[i].pipi = info.tdata[i].pipi;	 // Just sets info.tdata[i].pipi to itself (SETPIPI already sets pipi, so maybe this line shouldn't be here in the first place)
-			}
-		}
+	//	if (flag.testFlagSet(SETFREQ)) {
+	//		for (i = 0; i < MAXMELODY; i++) {
+	//			info.tdata[i].freq = mi.tdata[i].freq;
+	//			info.tdata[i].pipi = info.tdata[i].pipi;	 // Just sets info.tdata[i].pipi to itself (SETPIPI already sets pipi, so maybe this line shouldn't be here in the first place)
+	//		}
+	//	}
 
-		if (flag.testFlagSet(SETWAVE))
-			for (i = 0; i < MAXTRACK; i++)
-				info.tdata[i].wave_no = mi.tdata[i].wave_no;
+	//	if (flag.testFlagSet(SETWAVE))
+	//		for (i = 0; i < MAXTRACK; i++)
+	//			info.tdata[i].wave_no = mi.tdata[i].wave_no;
 
-		if (flag.testFlagSet(SETPIPI))
-			for (i = 0; i < MAXTRACK; i++)
-				info.tdata[i].pipi = mi.tdata[i].pipi;
+	//	if (flag.testFlagSet(SETPIPI))
+	//		for (i = 0; i < MAXTRACK; i++)
+	//			info.tdata[i].pipi = mi.tdata[i].pipi;
 
-		return true;
-	}
+	//	return true;
+	//}
 	// 指定の数だけNoteDataの領域を確保(初期化) (Allocate the specified number of NoteData areas (initialization))
 	bool NoteAlloc(ushort alloc) {
 		int i,j;
@@ -237,8 +228,6 @@ struct Organya {
 
 		for (j = 0; j < MAXMELODY; j++)
 			MakeOrganyaWave(cast(byte)j, info.tdata[j].wave_no, info.tdata[j].pipi);
-
-		track = 0;	// 今はここに書いておく (Write here now)
 
 		return true;
 	}

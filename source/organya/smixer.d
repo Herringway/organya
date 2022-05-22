@@ -1,4 +1,4 @@
-module smixer;
+module organya.smixer;
 
 import std.algorithm.comparison;
 import std.experimental.logger;
