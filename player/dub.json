@@ -1,0 +1,10 @@
+{
+	"description": "organya player",
+	"license": "BSL-1.0",
+	"name": "player",
+	"targetType": "executable",
+	"dependencies": {
+		"organya": "*",
+		"bindbc-sdl": "~>1.0.0"
+	}
+}

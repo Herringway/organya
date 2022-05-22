@@ -1,0 +1,9 @@
+{
+	"description": "PIXEL's organya audio format",
+	"license": "proprietary",
+	"name": "organya",
+	"stringImportPaths": ["data"],
+	"subPackages": [
+		"player"
+	]
+}
