@@ -3,9 +3,9 @@ module organya.organya;
 import core.time;
 import std.experimental.logger;
 import std.algorithm.comparison;
+import std.math;
 
 import organya.pixtone;
-import organya.smixer;
 
 private enum MAXTRACK = 16;
 private enum MAXMELODY = 8;
@@ -109,7 +109,7 @@ private byte[0x100][100] initWaveData(const(ubyte)[] wavedata) @safe {
 struct Organya {
 	private Mixer_Sound*[2][8][8] lpORGANBUFFER;
 	package Mixer_Sound*[512] lpSECONDARYBUFFER;
-	package SoftwareMixer backend;
+	private Mixer_Sound *sound_list_head;
 	private MUSICINFO info;
 	private const(PIXTONEPARAMETER)[] gPtpTable;
 
@@ -125,6 +125,8 @@ struct Organya {
 	private ubyte[MAXTRACK] old_key = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF];	// 再生中の音 (Sound being played)
 	private ubyte[MAXTRACK] key_on;	// キースイッチ (Key switch)
 	private ubyte[MAXTRACK] key_twin;	// 今使っているキー(連続時のノイズ防止の為に二つ用意) (Currently used keys (prepared for continuous noise prevention))
+	private uint timer_master;
+	private uint output_frequency = 48000;
 	public void InitOrgData() @safe {
 		info.alloc_note = ALLOCNOTE;
 		info.dot = 4;
@@ -400,8 +402,6 @@ struct Organya {
 	// Start and end organya
 	public void initialize() @safe {
 		InitOrgData();
-
-		backend.setMusicCallback(&OrganyaCallback);
 	}
 	// Load organya file
 	public bool LoadOrganya(const(ubyte)[] data) @system
@@ -426,7 +426,7 @@ struct Organya {
 	}
 
 	public void PlayOrganyaMusic() @safe {
-		backend.setMusicTimer(info.wait);
+		setMusicTimer(info.wait);
 	}
 	private bool MakeSoundObject8(const byte[] wavep, byte track, byte pipi) @safe {
 		uint i,j,k;
@@ -469,13 +469,13 @@ struct Organya {
 					wp_sub = wp_sub[1 .. $];
 				}
 
-				lpORGANBUFFER[track][j][k] = backend.createSound(22050, wp[0 .. data_size]);
+				lpORGANBUFFER[track][j][k] = createSound(22050, wp[0 .. data_size]);
 
 				if (lpORGANBUFFER[track][j][k] == null) {
 					return false;
 				}
 
-				backend.seek(*lpORGANBUFFER[track][j][k], 0);
+				lpORGANBUFFER[track][j][k].seek(0);
 			}
 		}
 
@@ -484,16 +484,16 @@ struct Organya {
 	private void ChangeOrganFrequency(ubyte key, byte track, int a) @safe nothrow {
 		for (int j = 0; j < 8; j++)
 			for (int i = 0; i < 2; i++)
-				backend.setFrequency(*lpORGANBUFFER[track][j][i], cast(uint)(((oct_wave[j].wave_size * freq_tbl[key]) * oct_wave[j].oct_par) / 8 + (a - 1000)));	// 1000を+αのデフォルト値とする (1000 is the default value for + α)
+				lpORGANBUFFER[track][j][i].frequency = cast(uint)(((oct_wave[j].wave_size * freq_tbl[key]) * oct_wave[j].oct_par) / 8 + (a - 1000));	// 1000を+αのデフォルト値とする (1000 is the default value for + α)
 	}
 	private void ChangeOrganPan(ubyte key, ubyte pan, byte track) @safe nothrow {	// 512がMAXで256がﾉｰﾏﾙ (512 is MAX and 256 is normal)
 		if (old_key[track] != KEYDUMMY)
-			backend.setPan(*lpORGANBUFFER[track][old_key[track] / 12][key_twin[track]], (pan_tbl[pan] - 0x100) * 10);
+			lpORGANBUFFER[track][old_key[track] / 12][key_twin[track]].pan = (pan_tbl[pan] - 0x100) * 10;
 	}
 
 	private void ChangeOrganVolume(int no, int volume, byte track) @safe nothrow {	// 300がMAXで300がﾉｰﾏﾙ (300 is MAX and 300 is normal)
 		if (old_key[track] != KEYDUMMY)
-			backend.setVolume(*lpORGANBUFFER[track][old_key[track] / 12][key_twin[track]], cast(int)((volume - 0xFF) * 8));
+			lpORGANBUFFER[track][old_key[track] / 12][key_twin[track]].volume = cast(short)((volume - 0xFF) * 8);
 	}
 
 	// サウンドの再生 (Play sound)
@@ -502,8 +502,8 @@ struct Organya {
 			switch (mode) {
 				case 0:	// 停止 (Stop)
 					if (old_key[track] != 0xFF) {
-						backend.stop(*lpORGANBUFFER[track][old_key[track] / 12][key_twin[track]]);
-						backend.seek(*lpORGANBUFFER[track][old_key[track] / 12][key_twin[track]], 0);
+						lpORGANBUFFER[track][old_key[track] / 12][key_twin[track]].stop();
+						lpORGANBUFFER[track][old_key[track] / 12][key_twin[track]].seek(0);
 					}
 					break;
 
@@ -512,7 +512,7 @@ struct Organya {
 
 				case 2:	// 歩かせ停止 (Stop playback)
 					if (old_key[track] != 0xFF) {
-						backend.play(*lpORGANBUFFER[track][old_key[track] / 12][key_twin[track]], SoundPlayFlags.normal);
+						lpORGANBUFFER[track][old_key[track] / 12][key_twin[track]].play(false);
 						old_key[track] = 0xFF;
 					}
 					break;
@@ -520,25 +520,25 @@ struct Organya {
 				case -1:
 					if (old_key[track] == 0xFF) {	// 新規鳴らす (New sound)
 						ChangeOrganFrequency(key % 12, track, freq);	// 周波数を設定して (Set the frequency)
-						backend.play(*lpORGANBUFFER[track][key / 12][key_twin[track]], SoundPlayFlags.looping);
+						lpORGANBUFFER[track][key / 12][key_twin[track]].play(true);
 						old_key[track] = key;
 						key_on[track] = 1;
 					}
 					else if (key_on[track] == 1 && old_key[track] == key) {	// 同じ音 (Same sound)
 						// 今なっているのを歩かせ停止 (Stop playback now)
-						backend.play(*lpORGANBUFFER[track][old_key[track] / 12][key_twin[track]], SoundPlayFlags.normal);
+						lpORGANBUFFER[track][old_key[track] / 12][key_twin[track]].play(false);
 						key_twin[track]++;
 						if (key_twin[track] > 1)
 							key_twin[track] = 0;
-						backend.play(*lpORGANBUFFER[track][key / 12][key_twin[track]], SoundPlayFlags.looping);
+						lpORGANBUFFER[track][key / 12][key_twin[track]].play(true);
 					}
 					else {	// 違う音を鳴らすなら (If you make a different sound)
-						backend.play(*lpORGANBUFFER[track][old_key[track] / 12][key_twin[track]], SoundPlayFlags.normal);	// 今なっているのを歩かせ停止 (Stop playback now)
+						lpORGANBUFFER[track][old_key[track] / 12][key_twin[track]].play(false);	// 今なっているのを歩かせ停止 (Stop playback now)
 						key_twin[track]++;
 						if (key_twin[track] > 1)
 							key_twin[track] = 0;
 						ChangeOrganFrequency(key % 12, track, freq);	// 周波数を設定して (Set the frequency)
-						backend.play(*lpORGANBUFFER[track][key / 12][key_twin[track]], SoundPlayFlags.looping);
+						lpORGANBUFFER[track][key / 12][key_twin[track]].play(true);
 						old_key[track] = key;
 					}
 
@@ -547,18 +547,18 @@ struct Organya {
 			}
 		}
 	}
-	private void OrganyaCallback() @safe nothrow {
-		PlayData();
-	}
+	//private void OrganyaCallback() @safe nothrow {
+	//	PlayData();
+	//}
 	// オルガーニャオブジェクトを開放 (Open Organya object)
 	private void ReleaseOrganyaObject(byte track) @safe {
 		for (int i = 0; i < 8; i++) {
 			if (lpORGANBUFFER[track][i][0] !is null) {
-				backend.destroySound(*lpORGANBUFFER[track][i][0]);
+				destroySound(*lpORGANBUFFER[track][i][0]);
 				lpORGANBUFFER[track][i][0] = null;
 			}
 			if (lpORGANBUFFER[track][i][1] !is null) {
-				backend.destroySound(*lpORGANBUFFER[track][i][1]);
+				destroySound(*lpORGANBUFFER[track][i][1]);
 				lpORGANBUFFER[track][i][1] = null;
 			}
 		}
@@ -578,17 +578,17 @@ struct Organya {
 	/////////////////////
 
 	private void ChangeDramFrequency(ubyte key, byte track) @safe nothrow {
-		backend.setFrequency(*lpSECONDARYBUFFER[150 + track], key * 800 + 100);
+		lpSECONDARYBUFFER[150 + track].frequency = key * 800 + 100;
 	}
 
 	private void ChangeDramPan(ubyte pan, byte track) @safe nothrow {
-		backend.setPan(*lpSECONDARYBUFFER[150 + track], (pan_tbl[pan] - 0x100) * 10);
+		lpSECONDARYBUFFER[150 + track].pan = (pan_tbl[pan] - 0x100) * 10;
 	}
 
 	private void ChangeDramVolume(int volume, byte track) @safe nothrow
 	in(lpSECONDARYBUFFER[150 + track] !is null)
 	{
-		backend.setVolume(*lpSECONDARYBUFFER[150 + track], cast(int)((volume - 0xFF) * 8));
+		lpSECONDARYBUFFER[150 + track].volume = cast(short)((volume - 0xFF) * 8);
 	}
 
 	// サウンドの再生 (Play sound)
@@ -596,15 +596,15 @@ struct Organya {
 		if (lpSECONDARYBUFFER[150 + track] !is null) {
 			switch (mode) {
 				case 0:	// 停止 (Stop)
-					backend.stop(*lpSECONDARYBUFFER[150 + track]);
-					backend.seek(*lpSECONDARYBUFFER[150 + track], 0);
+					lpSECONDARYBUFFER[150 + track].stop();
+					lpSECONDARYBUFFER[150 + track].seek(0);
 					break;
 
 				case 1:	// 再生 (Playback)
-					backend.stop(*lpSECONDARYBUFFER[150 + track]);
-					backend.seek(*lpSECONDARYBUFFER[150 + track], 0);
+					lpSECONDARYBUFFER[150 + track].stop();
+					lpSECONDARYBUFFER[150 + track].seek(0);
 					ChangeDramFrequency(key, track);	// 周波数を設定して (Set the frequency)
-					backend.play(*lpSECONDARYBUFFER[150 + track], SoundPlayFlags.normal);
+					lpSECONDARYBUFFER[150 + track].play(false);
 					break;
 
 				case 2:	// 歩かせ停止 (Stop playback)
@@ -625,7 +625,7 @@ struct Organya {
 	}
 
 	public void StopOrganyaMusic() @safe {
-		backend.setMusicTimer(0);
+		setMusicTimer(0);
 
 		// Stop notes
 		for (int i = 0; i < MAXMELODY; i++)
@@ -641,7 +641,7 @@ struct Organya {
 	}
 
 	public void EndOrganya() @safe {
-		backend.setMusicTimer(0);
+		setMusicTimer(0);
 
 		// Release everything related to org
 		ReleaseNote();
@@ -653,7 +653,29 @@ struct Organya {
 	}
 	public void fillBuffer(scope short[] finalBuffer) nothrow @safe {
 		int[0x800 * 2] buffer;
-		backend.mixSoundsAndUpdateMusic(buffer[0 .. finalBuffer.length]);
+		int[] stream = buffer[0 .. finalBuffer.length];
+
+		if (timer_master == 0) {
+			mixSounds(stream);
+		} else {
+			uint frames_done = 0;
+
+			while (frames_done != stream.length / 2) {
+				static ulong callback_timer;
+
+				if (callback_timer == 0) {
+					callback_timer = timer_master;
+					PlayData();
+				}
+
+				const ulong frames_to_do = min(callback_timer, stream.length / 2 - frames_done);
+
+				mixSounds(stream[frames_done * 2 .. frames_done * 2 + frames_to_do * 2]);
+
+				frames_done += frames_to_do;
+				callback_timer -= frames_to_do;
+			}
+		}
 		for (size_t i = 0; i < finalBuffer.length; ++i) {
 			finalBuffer[i] = cast(short)clamp(buffer[i], short.min, short.max);
 		}
@@ -750,7 +772,131 @@ struct Organya {
 		pt_size += MakePixToneObject(this, gPtpTable[137 .. 138], 6);
 		pt_size += MakePixToneObject(this, gPtpTable[138 .. 139], 7);
 	}
+	void setMusicTimer(uint milliseconds) @safe {
+		timer_master = (milliseconds * output_frequency) / 1000;
+	}
+	Mixer_Sound* createSound(uint frequency, const(ubyte)[] samples) @safe {
+		Mixer_Sound* sound = new Mixer_Sound();
+
+		sound.samples = new byte[](samples.length + 1);
+
+		foreach (idx, ref sample; sound.samples[0 .. $ - 1]) {
+			sample = samples[idx] - 0x80;
+		}
+
+		sound.playing = false;
+		sound.position = 0;
+		sound.position_subsample = 0;
+
+		sound.frequency = frequency;
+		sound.volume = 0;
+		sound.pan = 0;
+
+		sound.next = sound_list_head;
+		sound_list_head = sound;
+
+		return sound;
+	}
+
+	void destroySound(ref Mixer_Sound sound) @safe {
+		for (Mixer_Sound** sound_pointer = &sound_list_head; *sound_pointer != null; sound_pointer = &(*sound_pointer).next) {
+			if (**sound_pointer == sound) {
+				*sound_pointer = sound.next;
+				break;
+			}
+		}
+	}
+
+	void mixSounds(scope int[] stream) @safe nothrow {
+		for (Mixer_Sound* sound = sound_list_head; sound != null; sound = sound.next) {
+			if (sound.playing) {
+				int[] stream_pointer = stream;
+
+				for (size_t frames_done = 0; frames_done < stream.length / 2; ++frames_done) {
+					// Perform linear interpolation
+					const ubyte interpolation_scale = sound.position_subsample >> 8;
+
+					const byte output_sample = cast(byte)((sound.samples[sound.position] * (0x100 - interpolation_scale)
+									                                 + sound.samples[sound.position + 1] * interpolation_scale) >> 8);
+
+					// Mix, and apply volume
+
+					stream_pointer[0] += output_sample * sound.volume_l;
+					stream_pointer[1] += output_sample * sound.volume_r;
+					stream_pointer = stream_pointer[2 .. $];
+
+					// Increment sample
+					const uint next_position_subsample = sound.position_subsample + sound.advance_delta / output_frequency;
+					sound.position += next_position_subsample >> 16;
+					sound.position_subsample = next_position_subsample & 0xFFFF;
+
+					// Stop or loop sample once it's reached its end
+					if (sound.position >= (sound.samples.length - 1)) {
+						if (sound.looping) {
+							sound.position %= sound.samples.length - 1;
+						} else {
+							sound.playing = false;
+							sound.position = 0;
+							sound.position_subsample = 0;
+							break;
+						}
+					}
+				}
+			}
+		}
+	}
 }
 
 private immutable pass = "Org-01";
 private immutable pass2 = "Org-02";	// Pipi
+
+struct Mixer_Sound {
+	byte[] samples;
+	size_t position;
+	ushort position_subsample;
+	uint advance_delta;
+	bool playing;
+	bool looping;
+	short _volume;
+	short pan_l;
+	short pan_r;
+	short volume_l;
+	short volume_r;
+
+	Mixer_Sound* next;
+	void pan(int val) @safe nothrow {
+		pan_l = MillibelToScale(-val);
+		pan_r = MillibelToScale(val);
+
+		volume_l = cast(short)((pan_l * _volume) >> 8);
+		volume_r = cast(short)((pan_r * _volume) >> 8);
+	}
+	void volume(short val) @safe nothrow {
+		_volume = MillibelToScale(val);
+
+		volume_l = cast(short)((pan_l * _volume) >> 8);
+		volume_r = cast(short)((pan_r * _volume) >> 8);
+	}
+	void frequency(uint val) @safe nothrow {
+		advance_delta = val << 16;
+	}
+	void play(bool loop) @safe nothrow {
+		playing = true;
+		looping = loop;
+
+		samples[$ - 1] = loop ? samples[0] : 0;
+	}
+	void stop() @safe nothrow {
+		playing = false;
+	}
+	void seek(size_t position) @safe nothrow {
+		this.position = position;
+		position_subsample = 0;
+	}
+}
+
+private ushort MillibelToScale(int volume) @safe pure @nogc nothrow {
+	// Volume is in hundredths of a decibel, from 0 to -10000
+	volume = clamp(volume, -10000, 0);
+	return cast(ushort)(pow(10.0, volume / 2000.0) * 256.0);
+}

@@ -211,7 +211,7 @@ package int MakePixToneObject(ref Organya org, const(PIXTONEPARAMETER)[] ptp, in
 		}
 	}
 
-	org.lpSECONDARYBUFFER[no] = org.backend.createSound(22050, mixed_pcm_buffer[0 .. sample_count]);
+	org.lpSECONDARYBUFFER[no] = org.createSound(22050, mixed_pcm_buffer[0 .. sample_count]);
 
 	return sample_count;
 }
