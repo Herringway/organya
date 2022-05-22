@@ -4,8 +4,7 @@ import std.random;
 import std.math;
 import organya;
 
-align(1) struct PIXTONEPARAMETER2
-{
+align(1) struct PIXTONEPARAMETER2 {
 	align(1):
 	int model;
 	double num;
@@ -13,8 +12,7 @@ align(1) struct PIXTONEPARAMETER2
 	int offset;
 }
 
-align(1) struct PIXTONEPARAMETER
-{
+align(1) struct PIXTONEPARAMETER {
 	align(1):
 	int use;
 	int size;
@@ -103,32 +101,28 @@ void MakePixelWaveData(const PIXTONEPARAMETER ptp, ubyte[] pData) @safe {
 	i = 0;
 
 	dEnvelope = ptp.initial;
-	while (i < ptp.pointAx)
-	{
+	while (i < ptp.pointAx) {
 		envelopeTable[i] = cast(byte)dEnvelope;
 		dEnvelope = ((cast(double)ptp.pointAy - ptp.initial) / ptp.pointAx) + dEnvelope;
 		++i;
 	}
 
 	dEnvelope = ptp.pointAy;
-	while (i < ptp.pointBx)
-	{
+	while (i < ptp.pointBx) {
 		envelopeTable[i] = cast(byte)dEnvelope;
 		dEnvelope = ((cast(double)ptp.pointBy - ptp.pointAy) / cast(double)(ptp.pointBx - ptp.pointAx)) + dEnvelope;
 		++i;
 	}
 
 	dEnvelope = ptp.pointBy;
-	while (i < ptp.pointCx)
-	{
+	while (i < ptp.pointCx) {
 		envelopeTable[i] = cast(byte)dEnvelope;
 		dEnvelope = (cast(double)ptp.pointCy - ptp.pointBy) / cast(double)(ptp.pointCx - ptp.pointBx) + dEnvelope;
 		++i;
 	}
 
 	dEnvelope = ptp.pointCy;
-	while (i < 0x100)
-	{
+	while (i < 0x100) {
 		envelopeTable[i] = cast(byte)dEnvelope;
 		dEnvelope = dEnvelope - (ptp.pointCy / cast(double)(0x100 - ptp.pointCx));
 		++i;
@@ -138,23 +132,25 @@ void MakePixelWaveData(const PIXTONEPARAMETER ptp, ubyte[] pData) @safe {
 	dMain = ptp.oMain.offset;
 	dVolume = ptp.oVolume.offset;
 
-	if (ptp.oMain.num == 0.0)
+	if (ptp.oMain.num == 0.0) {
 		d1 = 0.0;
-	else
+	} else {
 		d1 = 256.0 / (ptp.size / ptp.oMain.num);
+	}
 
-	if (ptp.oPitch.num == 0.0)
+	if (ptp.oPitch.num == 0.0) {
 		d2 = 0.0;
-	else
+	} else {
 		d2 = 256.0 / (ptp.size / ptp.oPitch.num);
+	}
 
-	if (ptp.oVolume.num == 0.0)
+	if (ptp.oVolume.num == 0.0) {
 		d3 = 0.0;
-	else
+	} else {
 		d3 = 256.0 / (ptp.size / ptp.oVolume.num);
+	}
 
-	for (i = 0; i < ptp.size; ++i)
-	{
+	for (i = 0; i < ptp.size; ++i) {
 		a = cast(int)dMain % 0x100;
 		b = cast(int)dPitch % 0x100;
 		c = cast(int)dVolume % 0x100;
@@ -168,10 +164,11 @@ void MakePixelWaveData(const PIXTONEPARAMETER ptp, ubyte[] pData) @safe {
 		         / 64
 		         + 128);
 
-		if (gWaveModelTable[ptp.oPitch.model][b] < 0)
+		if (gWaveModelTable[ptp.oPitch.model][b] < 0) {
 			dMain += d1 - d1 * 0.5 * -cast(int)gWaveModelTable[ptp.oPitch.model][b] * ptp.oPitch.top / 64.0 / 64.0;
-		else
+		} else {
 			dMain += d1 + d1 * 2.0 * gWaveModelTable[ptp.oPitch.model][b] * ptp.oPitch.top / 64.0 / 64.0;
+		}
 
 		dPitch += d2;
 		dVolume += d3;
@@ -186,8 +183,7 @@ int MakePixToneObject(ref Organya org, const(PIXTONEPARAMETER)[] ptp, int no) @s
 
 	sample_count = 0;
 
-	for (i = 0; i < ptp.length; i++)
-	{
+	for (i = 0; i < ptp.length; i++) {
 		if (ptp[i].size > sample_count) {
 			sample_count = ptp[i].size;
 		}
@@ -201,30 +197,21 @@ int MakePixToneObject(ref Organya org, const(PIXTONEPARAMETER)[] ptp, int no) @s
 	pcm_buffer[0 .. sample_count] = 0x80;
 	mixed_pcm_buffer[0 .. sample_count] = 0x80;
 
-	for (i = 0; i < ptp.length; i++)
-	{
+	for (i = 0; i < ptp.length; i++) {
 		MakePixelWaveData(ptp[i], pcm_buffer);
 
-		for (j = 0; j < ptp[i].size; j++)
-		{
-			if (pcm_buffer[j] + mixed_pcm_buffer[j] - 0x100 < -0x7F)
+		for (j = 0; j < ptp[i].size; j++) {
+			if (pcm_buffer[j] + mixed_pcm_buffer[j] - 0x100 < -0x7F) {
 				mixed_pcm_buffer[j] = 0;
-			else if (pcm_buffer[j] + mixed_pcm_buffer[j] - 0x100 > 0x7F)
+			} else if (pcm_buffer[j] + mixed_pcm_buffer[j] - 0x100 > 0x7F) {
 				mixed_pcm_buffer[j] = 0xFF;
-			else
+			} else {
 				mixed_pcm_buffer[j] = cast(ubyte)(mixed_pcm_buffer[j] + pcm_buffer[j] - 0x80);
+			}
 		}
 	}
 
-	// This is self-assignment, so redundant. Maybe this used to be something to prevent audio popping ?
-	mixed_pcm_buffer[0] = mixed_pcm_buffer[0];
-	mixed_pcm_buffer[sample_count - 1] = mixed_pcm_buffer[sample_count - 1];
-
-	//TODO:
 	org.lpSECONDARYBUFFER[no] = org.backend.createSound(22050, mixed_pcm_buffer[0 .. sample_count]);
-
-	if (org.lpSECONDARYBUFFER[no] == null)
-		return -1;
 
 	return sample_count;
 }
