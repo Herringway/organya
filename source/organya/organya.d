@@ -23,9 +23,9 @@ private struct NoteList {
 
 	int x;	// Position
 	ubyte length;	// Sound length
-	ubyte y;	// Sound height
-	ubyte volume;	// Volume
-	ubyte pan;
+	ubyte y = keyDummy;	// Sound height
+	ubyte volume = volDummy;	// Volume
+	ubyte pan = panDummy;
 }
 
 // Track data * 8
@@ -162,12 +162,7 @@ struct Organya {
 			}
 
 			for (i = 0; i < alloc; i++) {
-				info.trackData[j].notePosition[i].from = null;
-				info.trackData[j].notePosition[i].to = null;
-				info.trackData[j].notePosition[i].length = 0;
-				info.trackData[j].notePosition[i].pan = panDummy;
-				info.trackData[j].notePosition[i].volume = volDummy;
-				info.trackData[j].notePosition[i].y = keyDummy;
+				info.trackData[j].notePosition[i] = NoteList.init;
 			}
 		}
 
@@ -188,8 +183,6 @@ struct Organya {
 
 	//// 以下は再生 (The following is playback)
 	private void playData() @safe nothrow {
-		int i;
-
 		// Handle fading out
 		if (fading && globalVolume) {
 			globalVolume -= 2;
@@ -199,7 +192,7 @@ struct Organya {
 		}
 
 		// メロディの再生 (Play melody)
-		for (i = 0; i < maxMelody; i++) {
+		for (int i = 0; i < maxMelody; i++) {
 			if (np[i] != null && playPosition == np[i].x) {
 				if (!mutedTracks[i] && np[i].y != keyDummy) {	// 音が来た。 (The sound has come.)
 					playOrganObject(np[i].y, -1, cast(byte)i, info.trackData[i].freq);
@@ -230,7 +223,7 @@ struct Organya {
 		}
 
 		// ドラムの再生 (Drum playback)
-		for (i = maxMelody; i < maxTrack; i++) {
+		for (int i = maxMelody; i < maxTrack; i++) {
 			if (np[i] != null && playPosition == np[i].x) {	// 音が来た。 (The sound has come.)
 				if (np[i].y != keyDummy && !mutedTracks[i]) {	// ならす (Tame)
 					playDrumObject(np[i].y, 1, cast(byte)(i - maxMelody));
