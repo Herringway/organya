@@ -52,7 +52,7 @@ int main(string[] args) {
 	auto filePath = args[1];
 	auto file = cast(ubyte[])read(args[1]);
 
-	// pxtone initialization
+	// organya initialization
 	Organya org;
 	trace("Initializing Organya");
 	org.initialize(sampleRate);
