@@ -4,7 +4,7 @@ import std.random;
 import std.math;
 import organya.organya;
 
-align(1) struct PIXTONEPARAMETER2 {
+private align(1) struct PixtoneParameter2 {
 align(1):
 	int model;
 	double num;
@@ -12,13 +12,13 @@ align(1):
 	int offset;
 }
 
-align(1) struct PIXTONEPARAMETER {
+package align(1) struct PixtoneParameter {
 align(1):
 	int use;
 	int size;
-	PIXTONEPARAMETER2 oMain;
-	PIXTONEPARAMETER2 oPitch;
-	PIXTONEPARAMETER2 oVolume;
+	PixtoneParameter2 oMain;
+	PixtoneParameter2 oPitch;
+	PixtoneParameter2 oVolume;
 	int initial;
 	int pointAx;
 	int pointAy;
@@ -28,9 +28,9 @@ align(1):
 	int pointCy;
 }
 
-private immutable gWaveModelTable = MakeWaveTables();
+private immutable waveModelTable = makeWaveTables();
 
-private byte[0x100][6] MakeWaveTables() @safe {
+private byte[0x100][6] makeWaveTables() @safe {
 	byte[0x100][6] table;
 	int i;
 
@@ -83,7 +83,7 @@ private byte[0x100][6] MakeWaveTables() @safe {
 	return table;
 }
 
-private void MakePixelWaveData(const PIXTONEPARAMETER ptp, ubyte[] pData) @safe {
+private void MakePixelWaveData(const PixtoneParameter ptp, ubyte[] pData) @safe {
 	int i;
 	int a, b, c, d;
 
@@ -155,12 +155,12 @@ private void MakePixelWaveData(const PIXTONEPARAMETER ptp, ubyte[] pData) @safe 
 		b = cast(int) dPitch % 0x100;
 		c = cast(int) dVolume % 0x100;
 		d = cast(int)(cast(double)(i * 0x100) / ptp.size);
-		pData[i] = cast(ubyte)(gWaveModelTable[ptp.oMain.model][a] * ptp.oMain.top / 64 * (((gWaveModelTable[ptp.oVolume.model][c] * ptp.oVolume.top) / 64) + 64) / 64 * envelopeTable[d] / 64 + 128);
+		pData[i] = cast(ubyte)(waveModelTable[ptp.oMain.model][a] * ptp.oMain.top / 64 * (((waveModelTable[ptp.oVolume.model][c] * ptp.oVolume.top) / 64) + 64) / 64 * envelopeTable[d] / 64 + 128);
 
-		if (gWaveModelTable[ptp.oPitch.model][b] < 0) {
-			dMain += d1 - d1 * 0.5 * -cast(int) gWaveModelTable[ptp.oPitch.model][b] * ptp.oPitch.top / 64.0 / 64.0;
+		if (waveModelTable[ptp.oPitch.model][b] < 0) {
+			dMain += d1 - d1 * 0.5 * -cast(int) waveModelTable[ptp.oPitch.model][b] * ptp.oPitch.top / 64.0 / 64.0;
 		} else {
-			dMain += d1 + d1 * 2.0 * gWaveModelTable[ptp.oPitch.model][b] * ptp.oPitch.top / 64.0 / 64.0;
+			dMain += d1 + d1 * 2.0 * waveModelTable[ptp.oPitch.model][b] * ptp.oPitch.top / 64.0 / 64.0;
 		}
 
 		dPitch += d2;
@@ -168,43 +168,43 @@ private void MakePixelWaveData(const PIXTONEPARAMETER ptp, ubyte[] pData) @safe 
 	}
 }
 
-package int MakePixToneObject(ref Organya org, const(PIXTONEPARAMETER)[] ptp, int no) @safe {
-	int sample_count;
+package int makePixToneObject(ref Organya org, const(PixtoneParameter)[] ptp, int no) @safe {
+	int sampleCount;
 	int i, j;
-	ubyte[] pcm_buffer;
-	ubyte[] mixed_pcm_buffer;
+	ubyte[] pcmBuffer;
+	ubyte[] mixedPCMBuffer;
 
-	sample_count = 0;
+	sampleCount = 0;
 
 	for (i = 0; i < ptp.length; i++) {
-		if (ptp[i].size > sample_count) {
-			sample_count = ptp[i].size;
+		if (ptp[i].size > sampleCount) {
+			sampleCount = ptp[i].size;
 		}
 	}
 
-	pcm_buffer = mixed_pcm_buffer = null;
+	pcmBuffer = mixedPCMBuffer = null;
 
-	pcm_buffer = new ubyte[](sample_count);
-	mixed_pcm_buffer = new ubyte[](sample_count);
+	pcmBuffer = new ubyte[](sampleCount);
+	mixedPCMBuffer = new ubyte[](sampleCount);
 
-	pcm_buffer[0 .. sample_count] = 0x80;
-	mixed_pcm_buffer[0 .. sample_count] = 0x80;
+	pcmBuffer[0 .. sampleCount] = 0x80;
+	mixedPCMBuffer[0 .. sampleCount] = 0x80;
 
 	for (i = 0; i < ptp.length; i++) {
-		MakePixelWaveData(ptp[i], pcm_buffer);
+		MakePixelWaveData(ptp[i], pcmBuffer);
 
 		for (j = 0; j < ptp[i].size; j++) {
-			if (pcm_buffer[j] + mixed_pcm_buffer[j] - 0x100 < -0x7F) {
-				mixed_pcm_buffer[j] = 0;
-			} else if (pcm_buffer[j] + mixed_pcm_buffer[j] - 0x100 > 0x7F) {
-				mixed_pcm_buffer[j] = 0xFF;
+			if (pcmBuffer[j] + mixedPCMBuffer[j] - 0x100 < -0x7F) {
+				mixedPCMBuffer[j] = 0;
+			} else if (pcmBuffer[j] + mixedPCMBuffer[j] - 0x100 > 0x7F) {
+				mixedPCMBuffer[j] = 0xFF;
 			} else {
-				mixed_pcm_buffer[j] = cast(ubyte)(mixed_pcm_buffer[j] + pcm_buffer[j] - 0x80);
+				mixedPCMBuffer[j] = cast(ubyte)(mixedPCMBuffer[j] + pcmBuffer[j] - 0x80);
 			}
 		}
 	}
 
-	org.secondaryAllocatedSounds[no] = org.createSound(22050, mixed_pcm_buffer[0 .. sample_count]);
+	org.secondaryAllocatedSounds[no] = org.createSound(22050, mixedPCMBuffer[0 .. sampleCount]);
 
-	return sample_count;
+	return sampleCount;
 }
