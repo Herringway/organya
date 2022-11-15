@@ -261,13 +261,13 @@ struct Organya {
 
 		playPosition = x;
 	}
-	public bool loadMusic(const(ubyte)[] p) @system
+	public bool loadMusic(const(ubyte)[] p) @safe
 		in(p, "No organya data")
 	{
 		static ushort readLE16(ref const(ubyte)[] p) { scope(exit) p = p[2 .. $]; return ((p[1] << 8) | p[0]); }
 		static uint readLE32(ref const(ubyte)[] p) { scope(exit) p = p[4 .. $]; return ((p[3] << 24) | (p[2] << 16) | (p[1] << 8) | p[0]); }
 
-		NoteList *np;
+		NoteList[] np;
 		int i,j;
 		char ver = 0;
 		ushort[maxTrack] noteCounts;
@@ -323,56 +323,48 @@ struct Organya {
 			}
 
 			// リストを作る (Make a list)
-			np = &info.trackData[j].notePosition[0];
+			np = info.trackData[j].notePosition;
 			info.trackData[j].noteList = &info.trackData[j].notePosition[0];
 			assert(np);
-			np.from = null;
-			np.to = (np + 1);
-			np++;
+			np[0].from = null;
+			np[0].to = &np[1];
 
-			for (i = 1; i < noteCounts[j]; i++) {
-				np.from = (np - 1);
-				np.to = (np + 1);
-				np++;
+			for (i = 1; i < noteCounts[j] - 1; i++) {
+				np[i].from = &np[i - 1];
+				np[i].to = &np[i + 1];
 			}
 
 			// 最後の音符のtoはNULL (The last note to is NULL)
-			np--;
-			np.to = null;
+			np[$ - 1].to = null;
 
 			// 内容を代入 (Assign content)
-			np = &info.trackData[j].notePosition[0];	// Ｘ座標 (X coordinate)
+			np = info.trackData[j].notePosition;	// Ｘ座標 (X coordinate)
 			for (i = 0; i < noteCounts[j]; i++) {
-				np.x = readLE32(p);
-				np++;
+				np[i].x = readLE32(p);
 			}
 
-			np = &info.trackData[j].notePosition[0];	// Ｙ座標 (Y coordinate)
+			np = info.trackData[j].notePosition;	// Ｙ座標 (Y coordinate)
 			for (i = 0; i < noteCounts[j]; i++) {
-				np.y = p[0];
+				np[i].y = p[0];
 				p = p[1 .. $];
-				np++;
 			}
 
-			np = &info.trackData[j].notePosition[0];	// 長さ (Length)
+			np = info.trackData[j].notePosition;	// 長さ (Length)
 			for (i = 0; i < noteCounts[j]; i++) {
-				np.length = p[0];
+				np[i].length = p[0];
 				p = p[1 .. $];
-				np++;
 			}
 
-			np = &info.trackData[j].notePosition[0];	// ボリューム (Volume)
+			np = info.trackData[j].notePosition;	// ボリューム (Volume)
 			for (i = 0; i < noteCounts[j]; i++) {
-				np.volume = p[0];
+				np[i].volume = p[0];
 				p = p[1 .. $];
-				np++;
 			}
 
-			np = &info.trackData[j].notePosition[0];	// パン (Pan)
+			np = info.trackData[j].notePosition;	// パン (Pan)
 			for (i = 0; i < noteCounts[j]; i++) {
-				np.pan = p[0];
+				np[i].pan = p[0];
 				p = p[1 .. $];
-				np++;
 			}
 		}
 
