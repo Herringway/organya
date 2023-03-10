@@ -1,8 +1,9 @@
 module organya.organya;
 
 import core.time;
-import std.experimental.logger;
 import std.algorithm.comparison;
+import std.exception;
+import std.experimental.logger;
 import std.math;
 
 import organya.pixtone;
@@ -121,9 +122,7 @@ struct Organya {
 			info.trackData[i].pipi = 0;
 		}
 
-		if (!noteAlloc(info.allocatedNotes)) {
-			error("Note allocation failed");
-		}
+		noteAlloc(info.allocatedNotes);
 		this.outputFrequency = outputFrequency;
 	}
 	// 曲情報を取得 (Get song information)
@@ -144,22 +143,13 @@ struct Organya {
 		return mi;
 	}
 	// 指定の数だけNoteDataの領域を確保(初期化) (Allocate the specified number of NoteData areas (initialization))
-	private bool noteAlloc(ushort alloc) @safe {
+	private void noteAlloc(ushort alloc) @safe {
 		int i,j;
 
 		for (j = 0; j < maxTrack; j++) {
 			info.trackData[j].waveNumber = 0;
 			info.trackData[j].noteList = null;
 			info.trackData[j].notePosition = new NoteList[](alloc);
-			if (info.trackData[j].notePosition == null) {
-				for (i = 0; i < maxTrack; i++) {
-					if (info.trackData[i].notePosition != null) {
-						info.trackData[i].notePosition = null;
-					}
-				}
-
-				return false;
-			}
 
 			for (i = 0; i < alloc; i++) {
 				info.trackData[j].notePosition[i] = NoteList.init;
@@ -168,16 +158,6 @@ struct Organya {
 
 		for (j = 0; j < maxMelody; j++) {
 			makeOrganyaWave(cast(byte)j, info.trackData[j].waveNumber, info.trackData[j].pipi);
-		}
-
-		return true;
-	}
-	// NoteDataを開放 (Release NoteData)
-	private void releaseNote() @safe {
-		for (int i = 0; i < maxTrack; i++) {
-			if (info.trackData[i].notePosition != null) {
-				info.trackData[i].notePosition = null;
-			}
 		}
 	}
 
@@ -261,7 +241,7 @@ struct Organya {
 
 		playPosition = x;
 	}
-	public bool loadMusic(const(ubyte)[] p) @safe
+	public void loadMusic(const(ubyte)[] p) @safe
 		in(p, "No organya data")
 	{
 		static ushort readLE16(ref const(ubyte)[] p) { scope(exit) p = p[2 .. $]; return ((p[1] << 8) | p[0]); }
@@ -272,9 +252,7 @@ struct Organya {
 		char ver = 0;
 		ushort[maxTrack] noteCounts;
 
-		if (p == null) {
-			return false;
-		}
+		enforce(p != null, "No data to load");
 
 		if(p[0 .. 6] == pass) {
 			ver = 1;
@@ -284,9 +262,7 @@ struct Organya {
 		}
 		p = p[6 .. $];
 
-		if(ver == 0) {
-			return false;
-		}
+		enforce(ver != 0, "Invalid version");
 
 		// 曲の情報を設定 (Set song information)
 		info.wait = readLE16(p);
@@ -377,7 +353,6 @@ struct Organya {
 
 		globalVolume = 100;
 		fading = 0;
-		return true;
 	}
 	public void setPosition(uint x) @safe {
 		setPlayPointer(x);
@@ -392,7 +367,7 @@ struct Organya {
 	public void playMusic() @safe {
 		setMusicTimer(info.wait);
 	}
-	private bool makeSoundObject8(const byte[] wavep, byte track, byte pipi) @safe {
+	private void makeSoundObject8(const byte[] wavep, byte track, byte pipi) @safe {
 		uint i,j,k;
 		uint waveTable;	// WAVテーブルをさすポインタ (Pointer to WAV table)
 		uint waveSize;	// 256;
@@ -412,10 +387,6 @@ struct Organya {
 				}
 
 				wp = new ubyte[](dataSize);
-
-				if(wp == null)	{// j = se_no
-					return false;
-				}
 
 
 				// Get wave data
@@ -438,15 +409,9 @@ struct Organya {
 
 				allocatedSounds[track][j][k] = createSound(22050, wp[0 .. dataSize]);
 
-				if (allocatedSounds[track][j][k] == null) {
-					return false;
-				}
-
 				allocatedSounds[track][j][k].seek(0);
 			}
 		}
-
-		return true;
 	}
 	private void changeOrganFrequency(ubyte key, byte track, int a) @safe nothrow {
 		for (int j = 0; j < 8; j++) {
@@ -534,15 +499,11 @@ struct Organya {
 		}
 	}
 	// 波形を１００個の中から選択して作成 (Select from 100 waveforms to create)
-	private bool makeOrganyaWave(byte track, byte waveNumber, byte pipi) @safe {
-		if (waveNumber > 99) {
-			return false;
-		}
+	private void makeOrganyaWave(byte track, byte waveNumber, byte pipi) @safe {
+		enforce(waveNumber <= 100, "Wave number out of range");
 
 		releaseOrganyaObject(track);
 		makeSoundObject8(waveData[waveNumber], track, pipi);
-
-		return true;
 	}
 	/////////////////////////////////////////////
 	//■オルガーニャドラムス■■■■■■■■/////// (Organya drums)
@@ -587,13 +548,10 @@ struct Organya {
 			}
 		}
 	}
-	public bool changeVolume(int volume) @safe {
-		if (volume < 0 || volume > 100) {
-			return false;
-		}
+	public void changeVolume(int volume) @safe {
+		enforce((volume >= 0) && (volume <= 100), "Volume out of range");
 
 		globalVolume = volume;
-		return true;
 	}
 
 	public void stopMusic() @safe {
@@ -617,8 +575,6 @@ struct Organya {
 		setMusicTimer(0);
 
 		// Release everything related to org
-		releaseNote();
-
 		for (int i = 0; i < maxMelody; i++) {
 			playOrganObject(0, 0, cast(byte)i, 0);
 			releaseOrganyaObject(cast(byte)i);
