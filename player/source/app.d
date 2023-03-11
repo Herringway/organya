@@ -5,6 +5,7 @@ import std.experimental.logger;
 import std.exception;
 import std.file;
 import std.format;
+import std.getopt;
 import std.path;
 import std.stdio;
 import std.string;
@@ -38,24 +39,28 @@ bool initAudio(SDL_AudioCallback fun, ubyte channels, uint sampleRate, void* use
 
 extern (C) void _sampling_func(void* user, ubyte* buf, int bufSize) nothrow {
 	Organya* org = cast(Organya*) user;
-	org.fillBuffer(cast(short[])(buf[0 .. bufSize]));
+	org.fillBuffer(cast(short[2][])(buf[0 .. bufSize]));
 }
 
 int main(string[] args) {
 	enum channels = 2;
 	enum sampleRate = 44100;
-	if (args.length < 2) {
+	InterpolationMethod interpolation;
+	auto help = getopt(args,
+		"i|interpolation", "Sets interpolation (linear, gaussian, sinc, cubic)", &interpolation);
+	if (help.helpWanted || args.length < 2) {
+		defaultGetoptPrinter("Organya player", help.options);
 		return 1;
 	}
 	(cast()sharedLog).logLevel = LogLevel.trace;
 
 	auto filePath = args[1];
-	auto file = cast(ubyte[])read(args[1]);
+	auto file = cast(ubyte[])read(filePath);
 
 	// organya initialization
 	Organya org;
 	trace("Initializing Organya");
-	org.initialize(sampleRate);
+	org.initialize(sampleRate, interpolation);
 
 	trace("Loading organya data");
 	org.loadData(cast(ubyte[])read("pixtone.tbl"));

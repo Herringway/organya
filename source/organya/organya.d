@@ -6,6 +6,7 @@ import std.exception;
 import std.experimental.logger;
 import std.math;
 
+import organya.interpolation;
 import organya.pixtone;
 
 private enum maxTrack = 16;
@@ -108,7 +109,8 @@ struct Organya {
 	private ubyte[maxTrack] keyTwin;	// 今使っているキー(連続時のノイズ防止の為に二つ用意) (Currently used keys (prepared for continuous noise prevention))
 	private uint masterTimer;
 	private uint outputFrequency = 48000;
-	public void initialize(uint outputFrequency) @safe {
+	private InterpolationMethod interpolationMethod;
+	public void initialize(uint outputFrequency, InterpolationMethod method) @safe {
 		info.allocatedNotes = allocNote;
 		info.dot = 4;
 		info.line = 4;
@@ -123,6 +125,7 @@ struct Organya {
 		}
 
 		noteAlloc(info.allocatedNotes);
+		this.interpolationMethod = method;
 		this.outputFrequency = outputFrequency;
 	}
 	// 曲情報を取得 (Get song information)
@@ -580,16 +583,14 @@ struct Organya {
 			releaseOrganyaObject(cast(byte)i);
 		}
 	}
-	public void fillBuffer(scope short[] finalBuffer) nothrow @safe {
-		int[0x800 * 2] buffer;
-		int[] stream = buffer[0 .. finalBuffer.length];
-
+	public void fillBuffer(scope short[2][] finalBuffer) nothrow @safe {
 		if (masterTimer == 0) {
-			mixSounds(stream);
+			mixSounds(finalBuffer);
 		} else {
 			uint framesDone = 0;
+			finalBuffer[] = [0, 0];
 
-			while (framesDone != stream.length / 2) {
+			while (framesDone != finalBuffer.length) {
 				static ulong callbackTimer;
 
 				if (callbackTimer == 0) {
@@ -597,16 +598,13 @@ struct Organya {
 					playData();
 				}
 
-				const ulong framesToDo = min(callbackTimer, stream.length / 2 - framesDone);
+				const ulong framesToDo = min(callbackTimer, finalBuffer.length - framesDone);
 
-				mixSounds(stream[framesDone * 2 .. framesDone * 2 + framesToDo * 2]);
+				mixSounds(finalBuffer[framesDone .. framesDone + framesToDo]);
 
 				framesDone += framesToDo;
 				callbackTimer -= framesToDo;
 			}
-		}
-		for (size_t i = 0; i < finalBuffer.length; ++i) {
-			finalBuffer[i] = cast(short)clamp(buffer[i], short.min, short.max);
 		}
 	}
 	public void loadData(const(ubyte)[] data) @safe {
@@ -707,11 +705,12 @@ struct Organya {
 	MixerSound* createSound(uint frequency, const(ubyte)[] samples) @safe {
 		MixerSound* sound = new MixerSound();
 
-		sound.samples = new byte[](samples.length + 1);
+		auto newSamples = new byte[](samples.length);
 
-		foreach (idx, ref sample; sound.samples[0 .. $ - 1]) {
+		foreach (idx, ref sample; newSamples) {
 			sample = samples[idx] - 0x80;
 		}
+		sound.samples = newSamples;
 
 		sound.playing = false;
 		sound.position = 0;
@@ -736,23 +735,26 @@ struct Organya {
 		}
 	}
 
-	void mixSounds(scope int[] stream) @safe nothrow {
+	void mixSounds(scope short[2][] stream) @safe nothrow {
 		for (MixerSound* sound = activeSoundList; sound != null; sound = sound.next) {
 			if (sound.playing) {
-				int[] streamPointer = stream;
+				short[2][] streamPointer = stream;
 
-				for (size_t framesDone = 0; framesDone < stream.length / 2; ++framesDone) {
-					// Perform linear interpolation
-					const ubyte interpolationScale = sound.positionSubsample >> 8;
-
-					const byte outputSample = cast(byte)((sound.samples[sound.position] * (0x100 - interpolationScale)
-									                                 + sound.samples[sound.position + 1] * interpolationScale) >> 8);
+				for (size_t framesDone = 0; framesDone < stream.length; ++framesDone) {
+					// Interpolate the samples
+					byte[8] interpolationBuffer;
+					const remaining = max(cast(ptrdiff_t)0, cast(ptrdiff_t)(interpolationBuffer.length - (sound.samples.length - sound.position)));
+					interpolationBuffer[0 .. $ - remaining] = sound.samples[sound.position .. min($, sound.position + 8)];
+					if (sound.looping && (remaining > 0)) {
+						interpolationBuffer[$ - remaining .. $] = sound.samples[0 .. remaining];
+					}
+					const outputSample = interpolate(interpolationMethod, interpolationBuffer[], sound.positionSubsample);
 
 					// Mix, and apply volume
 
-					streamPointer[0] += outputSample * sound.volumeL;
-					streamPointer[1] += outputSample * sound.volumeR;
-					streamPointer = streamPointer[2 .. $];
+					streamPointer[0][0] = cast(short)clamp(streamPointer[0][0] + outputSample * sound.volumeL, short.min, short.max);
+					streamPointer[0][1] = cast(short)clamp(streamPointer[0][1] + outputSample * sound.volumeR, short.min, short.max);
+					streamPointer = streamPointer[1 .. $];
 
 					// Increment sample
 					const uint nextPositionSubsample = sound.positionSubsample + sound.advanceDelta / outputFrequency;
@@ -760,9 +762,9 @@ struct Organya {
 					sound.positionSubsample = nextPositionSubsample & 0xFFFF;
 
 					// Stop or loop sample once it's reached its end
-					if (sound.position >= (sound.samples.length - 1)) {
+					if (sound.position >= (sound.samples.length)) {
 						if (sound.looping) {
-							sound.position %= sound.samples.length - 1;
+							sound.position %= sound.samples.length;
 						} else {
 							sound.playing = false;
 							sound.position = 0;
@@ -780,7 +782,7 @@ private immutable pass = "Org-01";
 private immutable pass2 = "Org-02";	// Pipi
 
 struct MixerSound {
-	private byte[] samples;
+	private const(byte)[] samples;
 	private size_t position;
 	private ushort positionSubsample;
 	private uint advanceDelta;
@@ -813,7 +815,6 @@ struct MixerSound {
 		playing = true;
 		looping = loop;
 
-		samples[$ - 1] = loop ? samples[0] : 0;
 	}
 	void stop() @safe nothrow {
 		playing = false;
