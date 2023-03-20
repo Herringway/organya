@@ -83,7 +83,7 @@ private byte[0x100][6] makeWaveTables() @safe {
 	return table;
 }
 
-private void MakePixelWaveData(const PixtoneParameter ptp, ubyte[] pData) @safe {
+void MakePixelWaveData(const PixtoneParameter ptp, ubyte[] pData) @safe {
 	int i;
 	int a, b, c, d;
 
@@ -166,45 +166,4 @@ private void MakePixelWaveData(const PixtoneParameter ptp, ubyte[] pData) @safe 
 		dPitch += d2;
 		dVolume += d3;
 	}
-}
-
-package int makePixToneObject(ref Organya org, const(PixtoneParameter)[] ptp, int no) @safe {
-	int sampleCount;
-	int i, j;
-	ubyte[] pcmBuffer;
-	ubyte[] mixedPCMBuffer;
-
-	sampleCount = 0;
-
-	for (i = 0; i < ptp.length; i++) {
-		if (ptp[i].size > sampleCount) {
-			sampleCount = ptp[i].size;
-		}
-	}
-
-	pcmBuffer = mixedPCMBuffer = null;
-
-	pcmBuffer = new ubyte[](sampleCount);
-	mixedPCMBuffer = new ubyte[](sampleCount);
-
-	pcmBuffer[0 .. sampleCount] = 0x80;
-	mixedPCMBuffer[0 .. sampleCount] = 0x80;
-
-	for (i = 0; i < ptp.length; i++) {
-		MakePixelWaveData(ptp[i], pcmBuffer);
-
-		for (j = 0; j < ptp[i].size; j++) {
-			if (pcmBuffer[j] + mixedPCMBuffer[j] - 0x100 < -0x7F) {
-				mixedPCMBuffer[j] = 0;
-			} else if (pcmBuffer[j] + mixedPCMBuffer[j] - 0x100 > 0x7F) {
-				mixedPCMBuffer[j] = 0xFF;
-			} else {
-				mixedPCMBuffer[j] = cast(ubyte)(mixedPCMBuffer[j] + pcmBuffer[j] - 0x80);
-			}
-		}
-	}
-
-	org.secondaryAllocatedSounds[no] = org.createSound(22050, mixedPCMBuffer[0 .. sampleCount]);
-
-	return sampleCount;
 }
