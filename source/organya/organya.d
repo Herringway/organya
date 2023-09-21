@@ -93,8 +93,8 @@ private byte[0x100][100] initWaveData(const(ubyte)[] data) @safe {
 
 struct Organya {
 	private size_t[2][8][8] allocatedSounds;
-	package size_t[512] secondaryAllocatedSounds;
-	Mixer mixer;
+	private size_t[512] secondaryAllocatedSounds;
+	private Mixer mixer;
 	private MusicInfo info;
 	private const(PixtoneParameter)[] pixtoneParameters;
 
